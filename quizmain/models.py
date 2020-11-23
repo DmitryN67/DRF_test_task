@@ -5,7 +5,7 @@ class Quiz(models.Model):
     """Класс опроса"""
 
     name = models.CharField(verbose_name="Название опроса", max_length=50)
-    start_date = models.DateField(verbose_name="Дата старта", auto_now=False, auto_now_add=False)
+    start_date = models.DateField(verbose_name="Дата начала", auto_now=False, auto_now_add=False)
     end_date = models.DateField(verbose_name="Дата окончания", auto_now=False, auto_now_add=False)
     description = models.TextField(verbose_name="Описание")
 
@@ -22,9 +22,9 @@ class Question(models.Model):
     """Класс вопроса"""
     
     QUESTION_TYPES = (
-        ('T', 'Ответ с текстом'),
-        ('CO', 'Выбор одного варианта'),
-        ('CM', 'Выбор нескольких вариантов'),
+        ('text', 'Ответ с текстом'),
+        ('choose_one', 'Выбор одного варианта'),
+        ('choose_many', 'Выбор нескольких вариантов'),
     )
 
     quiz = models.ForeignKey(Quiz, verbose_name="Опрос",  on_delete=models.CASCADE, related_name='questions')
@@ -59,8 +59,8 @@ class Answer(models.Model):
     """Класс ответов на вопросы"""
 
     user_id = models.PositiveIntegerField()
-    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='question')
-    choice = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='choice')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
+    #choice = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name='answers')
     answer_text = models.CharField(max_length=300)
 
     class Meta:

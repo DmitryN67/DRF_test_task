@@ -80,7 +80,9 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSIOM_CLASSES': (
         'rest_framework.permissions.IsAuthenticated'
-    )
+    ),
+    #'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    #'PAGE_SIZE': 1
 }
 
 # Database
