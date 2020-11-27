@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from django.contrib.auth.models import User
 
 
 class Quiz(models.Model):
@@ -27,8 +29,8 @@ class Question(models.Model):
         ('choose_many', 'Выбор нескольких вариантов'),
     )
 
-    quiz = models.ForeignKey(Quiz, verbose_name="Опрос",  on_delete=models.CASCADE, related_name='questions')
-    question_text = models.TextField(verbose_name="Текст вопроса")
+    quiz = models.ForeignKey(Quiz, verbose_name="Опрос",  on_delete=models.CASCADE, related_name='question')
+    question_text = models.TextField(verbose_name="Вопрос")
     question_type = models.CharField(verbose_name="Тип вопроса", max_length=50, choices=QUESTION_TYPES)
 
 
@@ -43,9 +45,9 @@ class Question(models.Model):
 class Choice(models.Model):
     """Класс вариантов ответов на вопросы с возможностью выбора"""
 
-    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='choices')
-    choice_text = models.CharField(max_length=300)
-    correct = models.BooleanField(default=False)
+    question = models.ForeignKey(Question, verbose_name="Вопрос", on_delete=models.CASCADE, related_name='choice')
+    choice_text = models.CharField(verbose_name="Вариант ответа",max_length=300)
+    correct = models.BooleanField(verbose_name="Правильный вариант",default=False)
 
     class Meta:
         verbose_name = "Вариант ответа"
@@ -58,10 +60,11 @@ class Choice(models.Model):
 class Answer(models.Model):
     """Класс ответов на вопросы"""
 
-    user_id = models.PositiveIntegerField()
-    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
-    #choice = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name='answers')
-    answer_text = models.CharField(max_length=300)
+    #user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, related_name='user_answer', blank=True, null=True)
+    user = models.PositiveIntegerField()
+    question = models.ForeignKey(Question, verbose_name="Вопрос", on_delete=models.DO_NOTHING, related_name='question_answer')
+    choices = models.ForeignKey(Choice, verbose_name="Варианты", on_delete=models.DO_NOTHING, related_name='choice_answer', blank=True, null=True)
+    answer_text = models.CharField(verbose_name="Ответ", max_length=50)
 
     class Meta:
         verbose_name = "Ответ"

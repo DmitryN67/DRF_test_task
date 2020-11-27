@@ -14,7 +14,7 @@ class ChoiceAdmin(admin.ModelAdmin):
     list_display = ['choice_text', 'correct', ]
 
 class AnswerAdmin(admin.ModelAdmin):
-    list_display = ['user_id', 'question', 'answer_text']
+    list_display = ['user', 'question', 'answer_text']
 
 
 admin.site.register(Quiz, QuizAdmin)

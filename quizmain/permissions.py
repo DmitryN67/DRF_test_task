@@ -9,10 +9,10 @@ class IsAdminOrReadOnly(BasePermission):
         
         return bool(request.method in SAFE_METHODS or request.user.is_staff)
 
-class IsAdminOrIsOwner(BasePermission):
+class IsAdminUserOrIsOwner(BasePermission):
     """
     The request is admin user, or is a read-only request.
     """    
     def has_object_permission(self, request, view, obj):
         
-        return bool(obj.user_id == request.user or request.user.is_staff)
+        return bool(obj.id == request.user or request.user.is_staff)
