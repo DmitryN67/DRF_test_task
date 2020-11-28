@@ -45,9 +45,9 @@ class Question(models.Model):
 class Choice(models.Model):
     """Класс вариантов ответов на вопросы с возможностью выбора"""
 
-    question = models.ForeignKey(Question, verbose_name="Вопрос", on_delete=models.CASCADE, related_name='choice')
+    question = models.ForeignKey(Question, verbose_name="Вопрос", on_delete=models.CASCADE, related_name='choices')
     choice_text = models.CharField(verbose_name="Вариант ответа",max_length=300)
-    correct = models.BooleanField(verbose_name="Правильный вариант",default=False)
+    correct = models.BooleanField(verbose_name="Правильный вариант",default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Вариант ответа"
