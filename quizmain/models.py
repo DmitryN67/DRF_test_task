@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
+from django.contrib.sessions.models import Session
 
 
 class Quiz(models.Model):
@@ -57,14 +58,27 @@ class Choice(models.Model):
         return self.choice_text
 
 
+class Respondent(models.Model):
+    """Класс респондентов"""
+    
+    user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, blank=True, null=True)
+    session = models.CharField(verbose_name="Сессия", max_length=100)
+    quiz = models.ManyToManyField(Quiz, verbose_name="Опрос", related_name='quiz_respondent')
+
+    def __str__(self):
+        if self.user is None:
+            return 'Anonymous'
+        return self.user.username
+
+
 class Answer(models.Model):
     """Класс ответов на вопросы"""
 
-    #user = models.ForeignKey(User, verbose_name="Пользователь", on_delete=models.CASCADE, related_name='user_answer', blank=True, null=True)
-    user = models.PositiveIntegerField()
-    question = models.ForeignKey(Question, verbose_name="Вопрос", on_delete=models.DO_NOTHING, related_name='question_answer')
-    choices = models.ForeignKey(Choice, verbose_name="Варианты", on_delete=models.DO_NOTHING, related_name='choice_answer', blank=True, null=True)
-    answer_text = models.CharField(verbose_name="Ответ", max_length=50)
+    user = models.ForeignKey(Respondent, verbose_name="Пользователь", on_delete=models.CASCADE)
+    quiz = models.ForeignKey(Quiz, verbose_name="Опрос", on_delete=models.CASCADE, related_name='quiz_answer')
+    question = models.ForeignKey(Question, verbose_name="Вопрос", on_delete=models.CASCADE, related_name='question_answer')
+    choices = models.ManyToManyField(Choice, verbose_name="Варианты", related_name='choice_answer', blank=True)
+    answer_text = models.CharField(verbose_name="Ответ", max_length=50, blank=True)
 
     class Meta:
         verbose_name = "Ответ"

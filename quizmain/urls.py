@@ -1,20 +1,9 @@
 from rest_framework.routers import SimpleRouter
-from .api import ActiveQuizView, UserAnswerViewSet
+from .api import ActiveQuizView, UserViewSet, RespondentViewSet
 from .api import QuizViewSet, QuestionViewSet, ChoiceViewSet, AnswerViewSet
 from django.urls import path, include
 from .models import Quiz
 
-
-quiz_list = QuizViewSet.as_view({
-    'get': 'list',
-    'post': 'create'
-})
-quiz_detail = QuizViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
-})
 
 router = SimpleRouter()
 
@@ -23,10 +12,13 @@ router.register('quiz', QuizViewSet)
 router.register('question', QuestionViewSet)
 router.register('choice', ChoiceViewSet)
 router.register('answer', AnswerViewSet)
-router.register('user', UserAnswerViewSet)
+router.register('user', UserViewSet, basename='user')
+router.register('respondent', RespondentViewSet)
+
 
 urlpatterns = [
     path('api-auth/', include('rest_framework.urls')),
+    #path('user/', UserViewSet.as_view()),
 ]
 
 urlpatterns += router.urls

@@ -1,7 +1,11 @@
 
 from django.contrib.auth.models import User
+from django.db.models import F, Count, Value
 
-from rest_framework.viewsets import ModelViewSet
+from rest_framework import generics
+from django.contrib.sessions.models import Session
+
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly ,IsAdminUser
@@ -11,9 +15,9 @@ from rest_framework.serializers import ValidationError
 
 from .permissions import IsAdminOrReadOnly, IsAdminUserOrIsOwner
 
-from .models import Quiz, Question, Choice, Answer
+from .models import Quiz, Question, Choice, Answer, Respondent
 from .serializers import QuizSerializer, QuestionSerializer, ChoiceSerializer
-from .serializers import AnswerSerializer, UserSerializer
+from .serializers import AnswerSerializer, UserSerializer, RespondentSerializer
 from .util import token_to_int
 
 from datetime import datetime
@@ -51,16 +55,44 @@ class AnswerViewSet(ModelViewSet):
     queryset = Answer.objects.all()
     serializer_class = AnswerSerializer
 
+
     def perform_create(self, serializer):
+        if not self.request.session or not self.request.session.session_key:
+            self.request.session.save()
+        session = Session.objects.get(pk=self.request.session.session_key)
+        quiz = Quiz.objects.get(name=self.request.POST['quiz'])
         if self.request.user.is_authenticated:
-            serializer.save(user=self.request.user.id)
+            user, created = Respondent.objects.get_or_create(user=self.request.user)
         else:
-            serializer.save(user=token_to_int(self.request.COOKIES['csrftoken'], 8))
+            user, created = Respondent.objects.get_or_create(session=session)
+        user.quiz.add(quiz)    
+        serializer.save(user=user)    
+        #if not hasattr(self.request, 'answer_text'):
+        #    serializer.save(answer_text=serializer.validated_data['hoices'])
 
 
-class UserAnswerViewSet(ModelViewSet):
+class UserViewSet(ModelViewSet):
     
-    queryset = User.objects.filter(is_staff=False)
+    queryset = Answer.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    """
+    def get_queryset(self):
+        #
+        #This view should return a list of all the purchases
+        #for the currently authenticated user.
+        #
+        user = self.request.user.id
+        return Session.objects.all()
+    """
+
+class RespondentViewSet(ReadOnlyModelViewSet):
+    
+    #queryset = Answer.objects.values('user', 'quiz__name').annotate(count_answers=Count('answer_text'))#annotate(quiz=F('quiz'))
+    #queryset = Answer.objects.values('respondent').distinct().annotate(quiz=F('quiz'), answers=F('answer_text'))#annotate(quiz=F('quiz'))
+    #queryset = Answer.objects.all()
+    queryset = Respondent.objects.all()
+    serializer_class = RespondentSerializer
+
+    #permission_classes = [IsAdminOrReadOnly]
+    
    

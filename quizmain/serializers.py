@@ -1,31 +1,17 @@
 from rest_framework import serializers
-from rest_framework.serializers import ModelSerializer, RelatedField
+from rest_framework.serializers import ModelSerializer
 from rest_framework.serializers import ValidationError
-from rest_framework.serializers import ReadOnlyField
-from rest_framework.serializers import SerializerMethodField
+
 from django.contrib.auth.models import User
+from django.contrib.sessions.models import Session
+from django.db.models import F, Count, Value
 
 from .util import token_to_int
 
-from .models import Quiz, Question, Choice, Answer
+from .models import Quiz, Question, Choice, Answer, Respondent
 
 
-class DynamicTypeRelatedField(serializers.RelatedField):
-
-    def to_representation(self, value):
-        """
-        Serialize objects to a simple textual representation.
-        """
-        if value == 'one':
-            return serializers.CharField
-        elif value == 'choose_one':
-            return serializers.ChoiceField
-        else:
-            return serializers.MultipleChoiceField    
-        raise Exception(f'Занчение {value} недопустимо')
-
-
-class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+class DynamicFieldsModelSerializer(ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         fields = kwargs.pop('fields', None)
@@ -37,25 +23,6 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
-
-
-class ChoicePrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
-    def display_value(self, instance):
-        return f"{instance.choice_text}"
-
-
-class CurrentUserDefault(object):
-    #def set_context(self, serializer_field):
-        #self.user_id = serializer_field.context['request'].user.id
-#
-    #def __call__(self):
-        #return self.user_id
-
-
-    requires_context = True
-
-    def __call__(self, serializer_field):
-        return serializer_field.context['request'].user
 
 
 class ChoiceSerializer(DynamicFieldsModelSerializer):
@@ -76,7 +43,7 @@ class ChoiceSerializer(DynamicFieldsModelSerializer):
         return data
 
 
-class QuestionSerializer(ModelSerializer):
+class QuestionSerializer(DynamicFieldsModelSerializer):
     """Список вопросов"""
 
     choices = ChoiceSerializer(many=True, fields=('choice_text', 'correct'), required=False)
@@ -101,38 +68,20 @@ class QuestionSerializer(ModelSerializer):
             Choice.objects.create(question=question, **choice)
         return question   
 
-    
-class QuestionPassSerializer(ModelSerializer):
-    """Список вопросов"""
-
-    #choice = serializers.SlugRelatedField(many=True, slug_field='choice_text', read_only=True)
-    
-    class Meta:
-        model = Question
-        fields = ('quiz', 'question_text', 'choice')
-
 
 class QuizSerializer(ModelSerializer):
     """Список опросов"""
 
-    question = QuestionSerializer(many=True)
+    question = QuestionSerializer(many=True, fields=('question_text', 'question_type', 'choices'))
 
     class Meta:
         model = Quiz
         fields = ('name', 'start_date', 'end_date', 'description', 'question')
         validators = []
 
-    #def get_question(self, obj):
-        #questions = Question.objects.filter(quiz=obj)
-        #serializer = QuestionSerializer(instance=questions, many=True)
-        #return serializer.data
 
-    
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        #request = self.context.get('request')
-        #raise ValidationError({f"Данные - {data}, запрос - {request}"})
-        #if not request.user.is_staff:
         data.pop('question.choices.question', None)
         return data    
 
@@ -153,129 +102,158 @@ class QuizSerializer(ModelSerializer):
         return data       
 
 
-class UserSerializer(serializers.ModelSerializer):
-    
-    user_answer = serializers.SlugRelatedField(many=True, read_only=True, slug_field='answer_text')
-    #user_answer = QuizSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'user_answer']
-
-
 class AnswerSerializer(ModelSerializer):
 
-    #user = serializers.ReadOnlyField(source='user.username' )
-    #question = QuestionSerializer()
-    #question = serializers.SerializerMethodField()
-
-    #choices = serializers.SlugRelatedField(queryset=Choice.objects.all(), many=True, slug_field='choice_text', required=False)
-    
-    #choices = ChoiceSerializer(many=True)
-    #choices = serializers.SerializerMethodField()
+    user = serializers.StringRelatedField()
+    quiz = serializers.SlugRelatedField(queryset=Quiz.objects.all(), slug_field='name')
+    question = serializers.SlugRelatedField(queryset=Question.objects.all(), slug_field='question_text')
+    choices = serializers.SlugRelatedField(queryset=Choice.objects.all(), many=True, slug_field='choice_text', required=False)
     
     class Meta:
         model = Answer
-        fields = ('user', 'question', 'choices', 'answer_text')
+        fields = ('user', 'quiz', 'question', 'choices', 'answer_text')
         read_only_fields = ('user', )
+        #validators = []
 
-
-    #def get_question(self, obj):
-    #    questions = Question.objects.filter(quiz=obj)
-    #    serializer = QuestionSerializer(instance=questions, many=True)
-    #    return serializer.data        
-
-
-    def to_representation(self, instance):
-        request = self.context.get('request')
-        data = super().to_representation(instance)
-        #raise ValidationError(f"Данные - {request.user.id}, запрос - {token_to_int(request.COOKIES['csrftoken'], 8)}")
-        #raise ValidationError(f"Данные - {data}, запрос - {request}")
-        question_type = Question.objects.get(pk=data['question'])
-        if question_type == 'text':
-            data.pop('choices', None)
-        #choices = Choice.objects.filter(question__exact=data['question']).values_list('choice_text', flat=True)
-        #data['choices'] = Choice.objects.filter(question__exact=data['question']).values_list('choice_text', flat=True)
-        #raise ValidationError(f"Тип вопроса - {question_type}, варианты - {data['choices']}")
-        if question_type in ['choose_one', 'choose_many']:
+    #def get_user(self, obj):
+        #if obj.user is None:
+            #return 'Anonymous'
+        #return obj.user
             
-            self.fields['answer_text'] = self.fields['choices']
-        #try:
-            #del self._readable_fields
-        #except AttributeError:
-            #pass
-        return data
-    """
-    def validate(self, attrs):
-        question_type = Question.objects.get(pk=attrs['question'].id).question_type
-        raise ValidationError(f"Тип вопроса - {question_type}")
-        try:
-            if question_type == "choose_one" or question_type == "text":
-                obj = Answer.objects.get(question=attrs['question'].id, user=attrs['user'])
-            elif question_type == "choose_many":
-                obj = Answer.objects.get(question=attrs['question'].id, userd=attrs['user'], choices=attrs['choices'])
-        except Answer.DoesNotExist:
-            return attrs
-        else:
-            raise serializers.ValidationError('Already responded')
-
     
+    def to_representation(self, obj):
+        rep = super().to_representation(obj)
+        if rep['answer_text'] == "":
+            rep['answer_text'] = rep['choices']
+        rep.pop('choices', None)
+        return rep
+    """
+    def create(self, validated_data):
+        #raise ValidationError(f"Данные - {validated_data}")
+        choices = validated_data.pop('choices')
+        answers = self.data['choices']
+        #answer = validated_data['answer_text']
+        obj = Answer.objects.create(**validated_data)
+        if 'answer_text' not in validated_data.keys():
+            #answers = [choice for choice in choices]
+            #raise ValidationError(f"Данные - {answers}")
+            obj.save(answer_text=answers)
+            for choice, value in choices.items():
+                field = getattr(obj, choice)
+                field.set(value)
+        else:    
+            obj.save()    
+        return obj
+
     def validate_answer_text(self, value):
-        #question_type = Question.objects.get(pk=attrs['question'].id).question_type
-        question_type = self.fields['question']
-        #choices = Choice.objects.filter(question__exact=attrs['question'].id).values_list('choice_text', flat=True)
-        #choices = Choice.objects.filter(question__exact=self.fields['question'].id).values_list('choice_text', flat=True)
-        #raise ValidationError(f"Тип вопроса - {question_type}, варианты - {1}")
-        if question_type == "choose_one":
-            #raise ValidationError(f"Ответ - {attrs['answer_text']}, варианты - {choices}")
-            if self.fields['answer_text'] not in choices:
-                serializers.ValidationError('Answer must be in list of choice') 
-            if len(attrs['answer_text'] > 1):
-                serializers.ValidationError('Answer must be one of item of choice')  
-        elif question_type == "choose_many":
-            if attrs['answer_text'] not in choices:
-                serializers.ValidationError('Answer must be in list of choice') 
-        return value
-    """    
+        raise ValidationError(f"Данные - {value}")
+        if not value:
+            return self.data['choices']
+
+          
+
+    def validate(self, data):
+        #raise ValidationError(f"Данные - {data}")
+        if self.is_valid():
+            if data['answer_text'] == "":
+                data['answer_text'] = self.data['choices']
+            #raise serializers.ValidationError("finish must occur after start")
+        return data        
+"""            
+            
+
+class QuizPassSerializer(ModelSerializer):
+
+    quiz_answer = serializers.StringRelatedField(many=True)
+
+    class Meta:
+        model = Quiz
+        fields = ('name', 'quiz_answer')
+
+
+class UserSerializer(ModelSerializer):
+
+    user = serializers.SerializerMethodField()
+    #session = serializers.PrimaryKeyRelatedField(read_only=True)
+    #quiz = 
+    #session_answers = serializers.SlugRelatedField(many=True, slug_field='answer_text', read_only=True)
+
+    class Meta:
+        model = Answer
+        fields = ('user', 'answer_text')
+        read_only_fields = ('user',)
+
+
+    def get_user(self, obj):
+        session = Answer.objects.get(session=obj.session)
+        uid = session.get_decoded().get('_auth_user_id')
+        try:
+            user = User.objects.get(pk=uid).username
+        except:
+            user = 'Anonymous'    
+        return user
     
+    def to_representation(self, obj):
+        rep = super().to_representation(obj)
+        rep.pop('session_key', None)
+        return rep
 
-    """
-    def save(self):
-        user = self.validated_data['user']
-        question = self.validated_data['question']
-        choices = self.validated_data['choices']
-        answer_text = self.validated_data['answer_text']
-        answer = self.data['answer_text']
-        user = self.data['user']
-        for question in answers:
-            question_id = Question.objects.get(pk=self.data['question']).id
-            choices = answers[question_id]
-            for choice_id in choices:
-                choice = Choice.objects.get(pk=choice_id)
-                Answer(user=user, question=question, choices=choice).save()
-                user.save()             
-    """
 
+class RespondentSerializer(ModelSerializer):
+#class RespondentSerializer(serializers.Serializer):
+
+    #quiz = serializers.SlugRelatedField(queryset=Quiz.objects.all(), slug_field='name')
+    #quiz = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    #answer = serializers.SerializerMethodField()
+    #user = serializers.SerializerMethodField()
+    #quiz = QuizSerializer(read_only=True, many=True)
+    quiz = QuizPassSerializer(many=True)
+    #answer_text = serializers.SerializerMethodField()
+    
+    
+    #user = serializers.IntegerField()
+    #quiz = serializers.CharField(max_length=200)
+    #answers = serializers.CharField(max_length=200)
+
+    class Meta:
+        model = Respondent
+        fields = ('user', 'session', 'quiz')
+        read_only_fields = ('user', 'session', 'quiz')
+
+    #def get_user(self, obj):
+        #users = Answer.objects.values('user').distinct()
+        ##raise ValidationError(f"Пользователи - {users}")
+        #return users
 """
-class AnswerSerializer(serializers.Serializer):
-    
-    user_id = serializers.IntegerField(default=CurrentUserDefault())
-    answers = serializers.JSONField()
-
-    def validate_answers(self, answers):
-        if not answers:
-            raise ValidationError("Поле ответа не может быть пустым")
+    def get_answer_text(self, obj):
+        answers = Answer.objects.filter(user=obj.id).values('answer_text')
         return answers
 
-    def save(self):
-        answers = self.data['answers']
-        user = self.context.user_id
-        for question_id in answers:
-            question = Question.objects.get(pk=question_id)
-            choices = answers[question_id]
-            for choice_id in choices:
-                choice = Choice.objects.get(pk=choice_id)
-                Answer(user_id=user, question=question, choice=choice).save()
-                user.is_answer = True
-                user.save()        
-"""        
+    def get_quiz(self, obj):
+        quizes = Quiz.objects.filter(quiz_respondent=obj.id).values('name').annotate(answers=F(self.get_answer_text(obj)))
+        return quizes
+#
+
+    
+    def get_quiz(self, obj):
+        quizes = Quiz.objects.filter(quiz_answer=obj.quiz).values('quiz')
+        return quizes
+
+
+    def to_representation (self, instance):  
+        rep = super().to_representation(instance)
+        if rep['answer_text'] == "":
+            rep['answer_text'] = rep['choices']
+        rep.pop('choices', None)
+        answers = [instance.choices.values_list('choice_text', flat=True) for instance in Answer.objects.filter(user=instance.user, quiz=instance.quiz)]
+        rep['quiz'] = {quiz.name: answers for quiz in Quiz.objects.filter(name=instance.quiz)}
+        rep.pop('answer_text', None)
+        #raise ValidationError(f"Ответы - {answers}")
+        return rep
+
+    def to_representation(self, obj):
+        return {"user": obj.user,
+                "quiz": {"name": obj.quiz.name, "slug": obj.job.slug, 
+             "title": obj.job.seo_title}
+                }    
+"""                
