@@ -85,4 +85,6 @@ class Answer(models.Model):
         verbose_name_plural = "Ответы"
 
     def __str__(self):
+        if self.answer_text == '':
+            return ', '.join([choice for choice in self.choices.all().values_list('choice_text', flat=True)])
         return self.answer_text

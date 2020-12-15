@@ -6,18 +6,15 @@ from rest_framework import generics
 from django.contrib.sessions.models import Session
 
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly ,IsAdminUser
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from .permissions import IsAdminOrReadOnly, IsAdminUserOrIsOwner
 
 from .models import Quiz, Question, Choice, Answer, Respondent
 from .serializers import QuizSerializer, QuestionSerializer, ChoiceSerializer
-from .serializers import AnswerSerializer, UserSerializer, RespondentSerializer
+from .serializers import AnswerSerializer, RespondentSerializer
 from .util import token_to_int
 
 from datetime import datetime
@@ -67,32 +64,11 @@ class AnswerViewSet(ModelViewSet):
             user, created = Respondent.objects.get_or_create(session=session)
         user.quiz.add(quiz)    
         serializer.save(user=user)    
-        #if not hasattr(self.request, 'answer_text'):
-        #    serializer.save(answer_text=serializer.validated_data['hoices'])
 
-
-class UserViewSet(ModelViewSet):
-    
-    queryset = Answer.objects.all()
-    serializer_class = UserSerializer
-    """
-    def get_queryset(self):
-        #
-        #This view should return a list of all the purchases
-        #for the currently authenticated user.
-        #
-        user = self.request.user.id
-        return Session.objects.all()
-    """
 
 class RespondentViewSet(ReadOnlyModelViewSet):
     
-    #queryset = Answer.objects.values('user', 'quiz__name').annotate(count_answers=Count('answer_text'))#annotate(quiz=F('quiz'))
-    #queryset = Answer.objects.values('respondent').distinct().annotate(quiz=F('quiz'), answers=F('answer_text'))#annotate(quiz=F('quiz'))
-    #queryset = Answer.objects.all()
     queryset = Respondent.objects.all()
     serializer_class = RespondentSerializer
-
-    #permission_classes = [IsAdminOrReadOnly]
-    
+    permission_classes = [IsAdminOrReadOnly]   
    
